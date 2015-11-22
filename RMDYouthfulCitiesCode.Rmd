@@ -1,0 +1,373 @@
+---
+title: "CapstoneProjectYouthfulCities"
+author: "AndrewHoward"
+date: "November 20, 2015"
+output: word_document
+---
+Welcome to the R Code for my Capstone Project using the Youthful Cities dataset provided by Youthful Cities to Ryerson University for use during the Capstone Project.
+
+For my project I decided to complete several Feature Selection models to help the Youthful Cities team to better understand their data and how their final rankings are impacted by the different features measured.
+---
+Part 1:
+---
+Input the data and packages into R and input the city names into the data:
+```{r}
+data <- read.csv("youthfulcities.csv")
+rownames(data) <- c("Accra","Amsterdam","Bangkok","Beirut","Berlin","Bogota","Boston","Beunos Aires","Cairo","Caracas","Casablanca","Chicago","Dallas","Dar Es Salaam","Detroit","Dubai","Durban","Hong Kong","Istanbul","Jakarta","Johannesburg","Karachi","Lagos","Lima","London","Los Angeles","Madrid","Manilla","Mexico City","Miami","Montreal","Moscow","Mumbai","Nairobi","New Dehli","New York City","Osaka","Paris","Quito","Rio De Janerio","Rome","San Fransico","Santiago","Sao Paulo","Seoul","Shanghai","Singapore","Sydney","Tehran","Tel Aviv","Tokyo","Toronto","Vancouver","Warsaw","Washington")
+library("DAAG", lib.loc="/Library/Frameworks/R.framework/Versions/3.1/Resources/library")
+library("MASS", lib.loc="/Library/Frameworks/R.framework/Versions/3.1/Resources/library")
+library("fields", lib.loc="/Library/Frameworks/R.framework/Versions/3.1/Resources/library")
+```
+---
+Part 2:
+---
+Create a baseline for the analysis using the full feature set:
+```{r}
+#create a linear model using all of the features possible
+full <- lm(OVERALL~Safety+Affordability+Transit+Health+Travel+Employment+Environment+Education+Entrepreneurship+Public.space+Financial.Services+Diversity
+           +Digital.access+Music+Arts+Sports+Film+Civic.engagement+Food.and.nightlife+Fashion+Youth.population,data=data)
+#Measure the predictive quality of the modesl to then create the root mean square error baseline for the rest #of the project
+basefull <- cv.lm(df=data,full,m=5)
+basermse <- sqrt((basefull$cvpred - basefull$OVERALL)^2)/nrow(basefull)
+```
+----
+Part 3:
+----
+Create a cluster dendogram of the features and cities to illustrate the data:
+```{r,echo=FALSE}
+#Prep the data by removing unnecessary data
+data1 <- data[,-1]
+data1 <- data1[,-22]
+#Create distance matrixes using euclidean distance
+d <- dist(t(data1),method = "euclidean")
+e <- dist(data1,method = "euclidean")
+#Create heirarchical clustering of the Features and plot the clusters
+hc <- hclust(d)
+plot(hc, main = "Cluster Dendogram of Features using Euclidean Distance",xlab="Features")
+#Add rectangles around the 7 Clusters we would like
+rhc <- rect.hclust(hc, k=7)
+#Create hierarchical clustering of the cities and plot that aswell
+citclu <- hclust(e)
+plot(citclu,main = "Cluster Dendogram of Cities using Euclidean Distance",xlab="Cities")
+```
+This also creates an easy platform to add a heatmap of the data:
+```{r,echo=FALSE}
+#Make a data matrix of the data so that it can be input into the heatmap function
+data_matrix <- data.matrix(data1)
+heatmap(data_matrix,Colv=hcd,scale="column")
+```
+---
+Part 3
+---
+Now I will create a linear model using the Cluster Dendogram of the 7 features from above:
+```{r,echo=FALSE}
+#Create the linear models using a random feature selected from each of the clusters
+clust1 <- lm(OVERALL~Affordability,data=data)
+clust3 <- lm(OVERALL~Music,data=data)
+clust5 <- lm(OVERALL~Transit,data=data)
+clust4 <- lm(OVERALL~Public.space,data=data)
+clust2 <- lm(OVERALL~Health,data=data)
+clust7 <- lm(OVERALL~Food.and.nightlife,data=data)
+clust6 <- lm(OVERALL~Arts,data=data)
+#Meausure the predictive quality of each of the models
+clust1 <- cv.lm(df=data, clust1, m=5)
+rmseclust1 <- sqrt((clust1$cvpred - clust1$OVERALL)^2)/nrow(clust1)
+clust2 <- cv.lm(df=data, clust2, m=5)
+rmseclust2 <- sqrt((clust2$cvpred - clust2$OVERALL)^2)/nrow(clust2)
+clust3 <- cv.lm(df=data, clust3, m=5)
+rmseclust3 <- sqrt((clust3$cvpred - clust3$OVERALL)^2)/nrow(clust3)
+clust4 <- cv.lm(df=data, clust4, m=5)
+rmseclust4 <- sqrt((clust4$cvpred - clust4$OVERALL)^2)/nrow(clust4)
+clust5 <- cv.lm(df=data, clust5, m=5)
+rmseclust5 <- sqrt((clust5$cvpred - clust5$OVERALL)^2)/nrow(clust5)
+clust6 <- cv.lm(df=data, clust6, m=5)
+rmseclust6 <- sqrt((clust6$cvpred - clust6$OVERALL)^2)/nrow(clust6)
+clust7 <- cv.lm(df=data, clust7, m=5)
+rmseclust7 <- sqrt((clust7$cvpred - clust7$OVERALL)^2)/nrow(clust7)
+#create a table of the results
+rmseclusttab <- cbind(rmseclust1,rmseclust2,rmseclust3,rmseclust4,rmseclust5,rmseclust6,rmseclust7)
+#separate the table into 5 Folds for plotting
+fivefoldrmseclust<-cbind(colMeans(rmseclusttab[1:11,]),colMeans(rmseclusttab[12:22,]),colMeans(rmseclusttab[23:33,]),colMeans(rmseclusttab[34:44,]),colMeans(rmseclusttab[45:55,]))
+#Name each of the features used to show in the plot
+rownames(fivefoldrmseclust) <- c("Afford","Health","Music","Pub. Space","Transit","Arts","Food")
+#Plot the data and add a red line at the baseline point
+boxplotrand <- boxplot(t(fivefoldrmseclust),ylim= c(0.7,2.5), las = 2, ylab="RMSE",main="Mean RMSE on 5 FCV of a Random Feature at 7 the Cluster CutOff")
+abline(h=mean(basermse),col="red")
+lines(rowMeans(fivefoldrmseclust))
+points(rowMeans(fivefoldrmseclust))
+```
+----
+Part 4
+----
+Experiment 1:
+
+I created a stepwise feature selection model to see the RMSE for each set of features selected:
+```{r,echo=FALSE}
+#Start with all of the models with one feature added each time
+one <- lm(OVERALL~Safety,data=data)
+ffold1 <- cv.lm(df=data, one, m=5)
+rmse1 <- sqrt((ffold1$cvpred - ffold1$OVERALL)^2)/nrow(ffold1)
+two <- lm(OVERALL~Safety+Affordability,data=data)
+ffold2 <- cv.lm(df=data, two, m=5)
+rmse2 <- sqrt((ffold2$cvpred - ffold2$OVERALL)^2)/nrow(ffold2)
+three <- lm(OVERALL~Safety+Affordability+Transit,data=data)
+ffold3 <- cv.lm(df=data, three, m=5)
+rmse3 <- sqrt((ffold3$cvpred - ffold3$OVERALL)^2)/nrow(ffold3)
+four <- lm(OVERALL~Safety+Affordability+Transit+Health,data=data)
+ffold4 <- cv.lm(df=data, four, m=5)
+rmse4 <- sqrt((ffold4$cvpred - ffold4$OVERALL)^2)/nrow(ffold4)
+five <- lm(OVERALL~Safety+Affordability+Transit+Health+Travel,data=data)
+ffold5 <- cv.lm(df=data, five, m=5)
+rmse5 <- sqrt((ffold5$cvpred - ffold5$OVERALL)^2)/nrow(ffold5)
+six <- lm(OVERALL~Safety+Affordability+Transit+Health+Travel+Employment,data=data)
+ffold6 <- cv.lm(df=data, six, m=5)
+rmse6 <- sqrt((ffold6$cvpred - ffold6$OVERALL)^2)/nrow(ffold6)
+seven <- lm(OVERALL~Safety+Affordability+Transit+Health+Travel+Employment+Environment,data=data)
+ffold7 <- cv.lm(df=data, seven, m=5)
+rmse7 <- sqrt((ffold7$cvpred - ffold7$OVERALL)^2)/nrow(ffold7)
+eight <- lm(OVERALL~Safety+Affordability+Transit+Health+Travel+Employment+Environment+Education,data=data)
+ffold8 <- cv.lm(df=data, eight, m=5)
+rmse8 <- sqrt((ffold8$cvpred - ffold8$OVERALL)^2)/nrow(ffold8)
+nine <- lm(OVERALL~Safety+Affordability+Transit+Health+Travel+Employment+Environment+Education+Entrepreneurship,data=data)
+ffold9 <- cv.lm(df=data, nine, m=5)
+rmse9 <- sqrt((ffold9$cvpred - ffold9$OVERALL)^2)/nrow(ffold9)
+ten <- lm(OVERALL~Safety+Affordability+Transit+Health+Travel+Employment+Environment+Education+Entrepreneurship+Public.space,data=data)
+ffold10 <- cv.lm(df=data, ten, m=5)
+rmse10 <- sqrt((ffold10$cvpred - ffold10$OVERALL)^2)/nrow(ffold10)
+eleven <- lm(OVERALL~Safety+Affordability+Transit+Health+Travel+Employment+Environment+Education+Entrepreneurship+Public.space+Financial.Services,data=data)
+ffold11 <- cv.lm(df=data, eleven, m=5)
+rmse11 <- sqrt((ffold11$cvpred - ffold11$OVERALL)^2)/nrow(ffold11)
+twelve <- lm(OVERALL~Safety+Affordability+Transit+Health+Travel+Employment+Environment+Education+Entrepreneurship+Public.space+Financial.Services+Diversity,data=data)
+ffold12 <- cv.lm(df=data, twelve, m=5)
+rmse12 <- sqrt((ffold12$cvpred - ffold12$OVERALL)^2)/nrow(ffold12)
+thirteen <- lm(OVERALL~Safety+Affordability+Transit+Health+Travel+Employment+Environment+Education+Entrepreneurship+Public.space+Financial.Services+Diversity
+               +Digital.access,data=data)
+ffold13 <- cv.lm(df=data, thirteen, m=5)
+rmse13 <- sqrt((ffold13$cvpred - ffold13$OVERALL)^2)/nrow(ffold13)
+fourteen <- lm(OVERALL~Safety+Affordability+Transit+Health+Travel+Employment+Environment+Education+Entrepreneurship+Public.space+Financial.Services+Diversity
+               +Digital.access+Music,data=data)
+ffold14 <- cv.lm(df=data, fourteen, m=5)
+rmse14 <- sqrt((ffold14$cvpred - ffold14$OVERALL)^2)/nrow(ffold14)
+fifteen <- lm(OVERALL~Safety+Affordability+Transit+Health+Travel+Employment+Environment+Education+Entrepreneurship+Public.space+Financial.Services+Diversity
+               +Digital.access+Music+Arts,data=data)
+ffold15 <- cv.lm(df=data, fifteen, m=5)
+rmse15 <- sqrt((ffold15$cvpred - ffold15$OVERALL)^2)/nrow(ffold15)
+sixteen <- lm(OVERALL~Safety+Affordability+Transit+Health+Travel+Employment+Environment+Education+Entrepreneurship+Public.space+Financial.Services+Diversity
+               +Digital.access+Music+Arts+Sports,data=data)
+ffold16 <- cv.lm(df=data, sixteen, m=5)
+rmse16 <- sqrt((ffold16$cvpred - ffold16$OVERALL)^2)/nrow(ffold16)
+seventeen <- lm(OVERALL~Safety+Affordability+Transit+Health+Travel+Employment+Environment+Education+Entrepreneurship+Public.space+Financial.Services+Diversity
+               +Digital.access+Music+Arts+Sports+Film,data=data)
+ffold17 <- cv.lm(df=data, seventeen, m=5)
+rmse17 <- sqrt((ffold17$cvpred - ffold17$OVERALL)^2)/nrow(ffold17)
+eightteen <- lm(OVERALL~Safety+Affordability+Transit+Health+Travel+Employment+Environment+Education+Entrepreneurship+Public.space+Financial.Services+Diversity
+               +Digital.access+Music+Arts+Sports+Film+Civic.engagement,data=data)
+ffold18 <- cv.lm(df=data, eightteen, m=5)
+rmse18 <- sqrt((ffold18$cvpred - ffold18$OVERALL)^2)/nrow(ffold18)
+nineteen <- lm(OVERALL~Safety+Affordability+Transit+Health+Travel+Employment+Environment+Education+Entrepreneurship+Public.space+Financial.Services+Diversity
+               +Digital.access+Music+Arts+Sports+Film+Civic.engagement+Food.and.nightlife,data=data)
+ffold19 <- cv.lm(df=data, nineteen, m=5)
+rmse19 <- sqrt((ffold19$cvpred - ffold19$OVERALL)^2)/nrow(ffold19)
+twenty <- lm(OVERALL~Safety+Affordability+Transit+Health+Travel+Employment+Environment+Education+Entrepreneurship+Public.space+Financial.Services+Diversity
+               +Digital.access+Music+Arts+Sports+Film+Civic.engagement+Food.and.nightlife+Fashion,data=data)
+ffold20 <- cv.lm(df=data, twenty, m=5)
+rmse20 <- sqrt((ffold20$cvpred - ffold20$OVERALL)^2)/nrow(ffold20)
+twentyone <- lm(OVERALL~Safety+Affordability+Transit+Health+Travel+Employment+Environment+Education+Entrepreneurship+Public.space+Financial.Services+Diversity
+               +Digital.access+Music+Arts+Sports+Film+Civic.engagement+Food.and.nightlife+Fashion+Youth.population,data=data)
+ffold21 <- cv.lm(df=data, twentyone, m=5)
+rmse21 <- sqrt((ffold21$cvpred - ffold21$OVERALL)^2)/nrow(ffold21)
+rmsetab <- cbind(rmse1,rmse2,rmse3,rmse4,rmse5,rmse6,rmse7,rmse8,rmse9,rmse10,rmse11,rmse12,rmse13,rmse14,rmse15,rmse16,
+                   rmse17,rmse18,rmse19,rmse20,rmse21)
+#Find the mean RMSE for each the 5 folds created
+fivefoldrmse<-cbind(colMeans(rmsetab[1:11,]),colMeans(rmsetab[12:22,]),colMeans(rmsetab[23:33,]),colMeans(rmsetab[34:44,]),colMeans(rmsetab[45:55,]))
+#Name each boxplot and which feature was added at each point
+rownames(fivefoldrmse) <- c("Safety","Afford","Transit","Health","Travel","Employ","Enviro","Education"
+                            ,"Entrepre","Pub. Space","Financial","Diversity","Digital","Music"
+                            ,"Arts","Sports","Film","Civic En.","Food","Fashion","Youth Pop.")
+#Plot the data adding a red line for baseline RMSE
+boxplot(t(fivefoldrmse),las = 2, ylab="RMSE",main="Mean RMSE on 5 Fold Cross Validation for Stepwise Feature Selection")
+abline(h=mean(basermse),col="red")
+lines(rowMeans(fivefoldrmse))
+points(rowMeans(fivefoldrmse))
+```
+---
+Part 4 and 5:
+---
+Experiment 2 and 3:
+
+I did the same experiment using 2 different starting points to show the differing results:
+```{r,echo=FALSE}
+#Experiment 2
+one2 <- lm(OVERALL~Music,data=data)
+ffold12 <- cv.lm(df=data, one2, m=5)
+rmse12 <- sqrt((ffold12$cvpred - ffold12$OVERALL)^2)/nrow(ffold12)
+two2 <- lm(OVERALL~Music+Arts,data=data)
+ffold22 <- cv.lm(df=data, two2, m=5)
+rmse22 <- sqrt((ffold22$cvpred - ffold22$OVERALL)^2)/nrow(ffold22)
+three2 <- lm(OVERALL~Music+Arts+Sports,data=data)
+ffold32 <- cv.lm(df=data, three2, m=5)
+rmse32 <- sqrt((ffold32$cvpred - ffold32$OVERALL)^2)/nrow(ffold32)
+four2 <- lm(OVERALL~Music+Arts+Sports+Film,data=data)
+ffold42 <- cv.lm(df=data, four2, m=5)
+rmse42 <- sqrt((ffold42$cvpred - ffold42$OVERALL)^2)/nrow(ffold42)
+five2 <- lm(OVERALL~Music+Arts+Sports+Film+Civic.engagement,data=data)
+ffold52 <- cv.lm(df=data, five2, m=5)
+rmse52 <- sqrt((ffold52$cvpred - ffold52$OVERALL)^2)/nrow(ffold52)
+six2 <- lm(OVERALL~Music+Arts+Sports+Film+Civic.engagement+Food.and.nightlife,data=data)
+ffold62 <- cv.lm(df=data, six2, m=5)
+rmse62 <- sqrt((ffold62$cvpred - ffold62$OVERALL)^2)/nrow(ffold62)
+seven2 <- lm(OVERALL~Music+Arts+Sports+Film+Civic.engagement+Food.and.nightlife+Fashion,data=data)
+ffold72 <- cv.lm(df=data, seven2, m=5)
+rmse72 <- sqrt((ffold72$cvpred - ffold72$OVERALL)^2)/nrow(ffold72)
+eight2 <- lm(OVERALL~Music+Arts+Sports+Film+Civic.engagement+Food.and.nightlife+Fashion+Youth.population,data=data)
+ffold82 <- cv.lm(df=data, eight2, m=5)
+rmse82 <- sqrt((ffold82$cvpred - ffold82$OVERALL)^2)/nrow(ffold82)
+nine2 <- lm(OVERALL~Music+Arts+Sports+Film+Civic.engagement+Food.and.nightlife+Fashion+Youth.population+Safety,data=data)
+ffold92 <- cv.lm(df=data, nine2, m=5)
+rmse92 <- sqrt((ffold92$cvpred - ffold92$OVERALL)^2)/nrow(ffold92)
+ten2 <- lm(OVERALL~Music+Arts+Sports+Film+Civic.engagement+Food.and.nightlife+Fashion+Youth.population+
+            Safety+Affordability,data=data)
+ffold102 <- cv.lm(df=data, ten2, m=5)
+rmse102 <- sqrt((ffold102$cvpred - ffold102$OVERALL)^2)/nrow(ffold102)
+eleven2 <- lm(OVERALL~Music+Arts+Sports+Film+Civic.engagement+Food.and.nightlife+Fashion+Youth.population+
+                Safety+Affordability+Transit,data=data)
+ffold112 <- cv.lm(df=data, eleven2, m=5)
+rmse112 <- sqrt((ffold112$cvpred - ffold112$OVERALL)^2)/nrow(ffold112)
+twelve2 <- lm(OVERALL~Music+Arts+Sports+Film+Civic.engagement+Food.and.nightlife+Fashion+Youth.population+
+                Safety+Affordability+Transit+Health,data=data)
+ffold122 <- cv.lm(df=data, twelve2, m=5)
+rmse122 <- sqrt((ffold122$cvpred - ffold122$OVERALL)^2)/nrow(ffold122)
+thirteen2 <- lm(OVERALL~Music+Arts+Sports+Film+Civic.engagement+Food.and.nightlife+Fashion+Youth.population+
+                  Safety+Affordability+Transit+Health+Travel,data=data)
+ffold132 <- cv.lm(df=data, thirteen2, m=5)
+rmse132 <- sqrt((ffold132$cvpred - ffold132$OVERALL)^2)/nrow(ffold132)
+fourteen2 <- lm(OVERALL~Music+Arts+Sports+Film+Civic.engagement+Food.and.nightlife+Fashion+Youth.population+
+                  Safety+Affordability+Transit+Health+Travel+Employment,data=data)
+ffold142 <- cv.lm(df=data, fourteen2, m=5)
+rmse142 <- sqrt((ffold142$cvpred - ffold142$OVERALL)^2)/nrow(ffold142)
+fifteen2 <- lm(OVERALL~Music+Arts+Sports+Film+Civic.engagement+Food.and.nightlife+Fashion+Youth.population+
+        Safety+Affordability+Transit+Health+Travel+Employment+Environment,data=data)
+ffold152 <- cv.lm(df=data, fifteen2, m=5)
+rmse152 <- sqrt((ffold152$cvpred - ffold152$OVERALL)^2)/nrow(ffold152)
+sixteen2 <- lm(OVERALL~Music+Arts+Sports+Film+Civic.engagement+Food.and.nightlife+Fashion+Youth.population+
+     Safety+Affordability+Transit+Health+Travel+Employment+Environment+Education,data=data)
+ffold162 <- cv.lm(df=data, sixteen2, m=5)
+rmse162 <- sqrt((ffold162$cvpred - ffold162$OVERALL)^2)/nrow(ffold162)
+seventeen2 <- lm(OVERALL~Music+Arts+Sports+Film+Civic.engagement+Food.and.nightlife+Fashion+Youth.population+
+    Safety+Affordability+Transit+Health+Travel+Employment+Environment+Education+Entrepreneurship,data=data)
+ffold172 <- cv.lm(df=data, seventeen2, m=5)
+rmse172 <- sqrt((ffold172$cvpred - ffold172$OVERALL)^2)/nrow(ffold172)
+eightteen2 <- lm(OVERALL~Safety+Affordability+Transit+Health+Travel+Employment+Environment+Education+Entrepreneurship+Public.space+Music+Arts+Sports+Film+Civic.engagement+Food.and.nightlife+Fashion+Youth.population,data=data)
+ffold182 <- cv.lm(df=data, eightteen2, m=5)
+rmse182 <- sqrt((ffold182$cvpred - ffold182$OVERALL)^2)/nrow(ffold182)
+nineteen2 <- lm(OVERALL~Safety+Affordability+Transit+Health+Travel+Employment+Environment+Education+Entrepreneurship+Public.space+Financial.Services
+               +Music+Arts+Sports+Film+Civic.engagement+Food.and.nightlife,data=data)
+ffold192 <- cv.lm(df=data, nineteen2, m=5)
+rmse192 <- sqrt((ffold192$cvpred - ffold192$OVERALL)^2)/nrow(ffold192)
+twenty2 <- lm(OVERALL~Safety+Affordability+Transit+Health+Travel+Employment+Environment+Education+Entrepreneurship+Public.space+Financial.Services+Diversity+Music+Arts+Sports+Film+Civic.engagement+Food.and.nightlife+Fashion,data=data)
+ffold202 <- cv.lm(df=data, twenty2, m=5)
+rmse202 <- sqrt((ffold202$cvpred - ffold202$OVERALL)^2)/nrow(ffold202)
+twentyone2 <- lm(OVERALL~Safety+Affordability+Transit+Health+Travel+Employment+Environment+Education+Entrepreneurship+Public.space+Financial.Services+Diversity+Digital.access+Music+Arts+Sports+Film+Civic.engagement+Food.and.nightlife+Fashion+Youth.population,data=data)
+ffold212 <- cv.lm(df=data, twentyone2, m=5)
+rmse212 <- sqrt((ffold212$cvpred - ffold212$OVERALL)^2)/nrow(ffold212)
+
+rmsetab2 <- cbind(rmse12,rmse22,rmse32,rmse42,rmse52,rmse62,rmse72,rmse82,rmse92,rmse102,rmse112,rmse122,
+                  rmse132,rmse142,rmse152,rmse162,rmse172,rmse182,rmse192,rmse202,rmse212)
+
+fivefoldrmse2<-cbind(colMeans(rmsetab2[1:11,]),colMeans(rmsetab2[12:22,]),colMeans(rmsetab2[23:33,]),colMeans(rmsetab2[34:44,]),colMeans(rmsetab2[45:55,]))
+
+rownames(fivefoldrmse2) <- c("Music","Arts","Sports","Film","Civic En.","Food","Fashion","Youth Pop.","Safety","Afford","Transit","Health","Travel","Employ","Enviro","Education"
+                             ,"Entrepre","Pub. Space","Financial","Diversity","Digital")
+
+boxplot(t(fivefoldrmse2), las = 2, ylab="RMSE",main="Mean RMSE on 5 Fold Cross Validation for Stepwise Feature Selection
+        Experiment 2")
+abline(h=mean(basermse),col="red")
+lines(rowMeans(fivefoldrmse2))
+points(rowMeans(fivefoldrmse2))
+
+#Experiment 3
+one3 <- lm(OVERALL~Education,data=data)
+ffold13 <- cv.lm(df=data, one3, m=5)
+rmse13 <- sqrt((ffold13$cvpred - ffold13$OVERALL)^2)/nrow(ffold13)
+two3 <- lm(OVERALL~Education+Entrepreneurship,data=data)
+ffold23 <- cv.lm(df=data, two3, m=5)
+rmse23 <- sqrt((ffold23$cvpred - ffold23$OVERALL)^2)/nrow(ffold23)
+three3 <- lm(OVERALL~Education+Entrepreneurship+Public.space,data=data)
+ffold33 <- cv.lm(df=data, three3, m=5)
+rmse33 <- sqrt((ffold33$cvpred - ffold33$OVERALL)^2)/nrow(ffold33)
+four3 <- lm(OVERALL~Education+Entrepreneurship+Public.space+Financial.Services,data=data)
+ffold43 <- cv.lm(df=data, four3, m=5)
+rmse43 <- sqrt((ffold43$cvpred - ffold43$OVERALL)^2)/nrow(ffold43)
+five3 <- lm(OVERALL~Education+Entrepreneurship+Public.space+Financial.Services+Diversity,data=data)
+ffold53 <- cv.lm(df=data, five3, m=5)
+rmse53 <- sqrt((ffold53$cvpred - ffold53$OVERALL)^2)/nrow(ffold53)
+six3 <- lm(OVERALL~Education+Entrepreneurship+Public.space+Financial.Services+Diversity+Digital.access,data=data)
+ffold63 <- cv.lm(df=data, six3, m=5)
+rmse63 <- sqrt((ffold63$cvpred - ffold63$OVERALL)^2)/nrow(ffold63)
+seven3 <- lm(OVERALL~Education+Entrepreneurship+Public.space+Financial.Services+Diversity+Digital.access+Music,data=data)
+ffold73 <- cv.lm(df=data, seven3, m=5)
+rmse73 <- sqrt((ffold73$cvpred - ffold73$OVERALL)^2)/nrow(ffold73)
+eight3 <- lm(OVERALL~Education+Entrepreneurship+Public.space+Financial.Services+Diversity+Digital.access
+             +Music+Arts,data=data)
+ffold83 <- cv.lm(df=data, eight3, m=5)
+rmse83 <- sqrt((ffold83$cvpred - ffold83$OVERALL)^2)/nrow(ffold83)
+nine3 <- lm(OVERALL~Education+Entrepreneurship+Public.space+Financial.Services+Diversity+Digital.access
+            +Music+Arts+Sports,data=data)
+ffold93 <- cv.lm(df=data, nine3, m=5)
+rmse93 <- sqrt((ffold93$cvpred - ffold93$OVERALL)^2)/nrow(ffold93)
+ten3 <- lm(OVERALL~Education+Entrepreneurship+Public.space+Financial.Services+Diversity+Digital.access
+           +Music+Arts+Sports+Film,data=data)
+ffold103 <- cv.lm(df=data, ten3, m=5)
+rmse103 <- sqrt((ffold103$cvpred - ffold103$OVERALL)^2)/nrow(ffold103)
+eleven3 <- lm(OVERALL~Education+Entrepreneurship+Public.space+Financial.Services+Diversity+Digital.access
+              +Music+Arts+Sports+Film+Civic.engagement,data=data)
+ffold113 <- cv.lm(df=data, eleven3, m=5)
+rmse113 <- sqrt((ffold113$cvpred - ffold113$OVERALL)^2)/nrow(ffold113)
+twelve3 <- lm(OVERALL~Education+Entrepreneurship+Public.space+Financial.Services+Diversity+Digital.access
+              +Music+Arts+Sports+Film+Civic.engagement+Food.and.nightlife,data=data)
+ffold123 <- cv.lm(df=data, twelve3, m=5)
+rmse123 <- sqrt((ffold123$cvpred - ffold123$OVERALL)^2)/nrow(ffold123)
+thirteen3 <- lm(OVERALL~Education+Entrepreneurship+Public.space+Financial.Services+Diversity+Digital.access
+                +Music+Arts+Sports+Film+Civic.engagement+Food.and.nightlife+Fashion,data=data)
+ffold133 <- cv.lm(df=data, thirteen3, m=5)
+rmse133 <- sqrt((ffold133$cvpred - ffold133$OVERALL)^2)/nrow(ffold133)
+fourteen3 <- lm(OVERALL~Education+Entrepreneurship+Public.space+Financial.Services+Diversity+Digital.access
+           +Music+Arts+Sports+Film+Civic.engagement+Food.and.nightlife+Fashion+Youth.population,data=data)
+ffold143 <- cv.lm(df=data, fourteen3, m=5)
+rmse143 <- sqrt((ffold143$cvpred - ffold143$OVERALL)^2)/nrow(ffold143)
+fifteen3 <- lm(OVERALL~Safety+Education+Entrepreneurship+Public.space+Financial.Services+Diversity+Digital.access+Music+Arts+Sports+Film+Civic.engagement+Food.and.nightlife+Fashion+Youth.population,data=data)
+ffold153 <- cv.lm(df=data, fifteen3, m=5)
+rmse153 <- sqrt((ffold153$cvpred - ffold153$OVERALL)^2)/nrow(ffold153)
+sixteen3 <- lm(OVERALL~Safety+Affordability+Education+Entrepreneurship+Public.space+Financial.Services+Diversity+Digital.access+Music+Arts+Sports+Film+Civic.engagement+Food.and.nightlife+Fashion+Youth.population,data=data)
+ffold163 <- cv.lm(df=data, sixteen3, m=5)
+rmse163 <- sqrt((ffold163$cvpred - ffold163$OVERALL)^2)/nrow(ffold163)
+seventeen3 <- lm(OVERALL~Safety+Affordability+Transit+Education+Entrepreneurship+Public.space+Financial.Services+Diversity+Digital.access+Music+Arts+Sports+Film+Civic.engagement+Food.and.nightlife+Fashion+Youth.population,data=data)
+ffold173 <- cv.lm(df=data, seventeen3, m=5)
+rmse173 <- sqrt((ffold173$cvpred - ffold173$OVERALL)^2)/nrow(ffold173)
+eightteen3 <- lm(OVERALL~Safety+Affordability+Transit+Health+Education+Entrepreneurship+Public.space+Financial.Services+Diversity+Digital.access+Music+Arts+Sports+Film+Civic.engagement+Food.and.nightlife+Fashion+Youth.population,data=data)
+ffold183 <- cv.lm(df=data, eightteen3, m=5)
+rmse183 <- sqrt((ffold183$cvpred - ffold183$OVERALL)^2)/nrow(ffold183)
+nineteen3 <- lm(OVERALL~Safety+Affordability+Transit+Health+Travel+Education+Entrepreneurship+Public.space+Financial.Services+Diversity+Digital.access+Music+Arts+Sports+Film+Civic.engagement+Food.and.nightlife+Fashion+Youth.population,data=data)
+ffold193 <- cv.lm(df=data, nineteen3, m=5)
+rmse193 <- sqrt((ffold193$cvpred - ffold193$OVERALL)^2)/nrow(ffold193)
+twenty3 <- lm(OVERALL~Safety+Affordability+Transit+Health+Travel+Employment+Education+Entrepreneurship+Public.space+Financial.Services+Diversity+Digital.access+Music+Arts+Sports+Film+Civic.engagement+Food.and.nightlife+Fashion+Youth.population,data=data)
+ffold203 <- cv.lm(df=data, twenty3, m=5)
+rmse203 <- sqrt((ffold203$cvpred - ffold203$OVERALL)^2)/nrow(ffold203)
+twentyone3 <- lm(OVERALL~Safety+Affordability+Transit+Health+Travel+Employment+Environment+Education+Entrepreneurship+Public.space+Financial.Services+Diversity+Digital.access+Music+Arts+Sports+Film+Civic.engagement+Food.and.nightlife+Fashion+Youth.population,data=data)
+ffold213 <- cv.lm(df=data, twentyone3, m=5)
+rmse213 <- sqrt((ffold213$cvpred - ffold213$OVERALL)^2)/nrow(ffold213)
+
+rmsetab3 <- cbind(rmse13,rmse23,rmse33,rmse43,rmse53,rmse63,rmse73,rmse83,rmse93,rmse103,rmse113,rmse123,rmse133,rmse143,rmse153,rmse163,rmse173,rmse183,rmse193,rmse203,rmse213)
+
+fivefoldrmse3<-cbind(colMeans(rmsetab3[1:11,]),colMeans(rmsetab3[12:22,]),colMeans(rmsetab3[23:33,]),colMeans(rmsetab3[34:44,]),colMeans(rmsetab3[45:55,]))
+
+rownames(fivefoldrmse3) <- c("Education","Entrepre","Pub. Space","Financial","Diversity","Digital","Music"
+                            ,"Arts","Sports","Film","Civic En.","Food","Fashion","Youth Pop."
+                            ,"Safety","Afford","Transit","Health","Travel","Employ","Enviro")
+
+boxplot(t(fivefoldrmse3), las = 2, ylab="RMSE",main="Mean RMSE on 5 Fold Cross Validation for Stepwise Feature Selection
+        Experiment 3")
+abline(h=mean(basermse),col="red")
+lines(rowMeans(fivefoldrmse3))
+points(rowMeans(fivefoldrmse3))
+```
